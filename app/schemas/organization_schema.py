@@ -14,3 +14,5 @@ class OrganizationCreate(BaseModel):
     website:str
 
     industry:str
+
+    max_applications:int

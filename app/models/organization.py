@@ -52,6 +52,11 @@ class Organization(Base):
         String
     )
 
+    max_applications = Column(
+
+    Integer
+    )
+
     status = Column(
         String,
         default="Pending"

@@ -28,6 +28,8 @@ from core.auth import get_current_user
 
 from models.candidate import Candidate
 
+from models.organization import Organization
+
 import uuid
 
 import shutil
@@ -37,11 +39,9 @@ import os
 
 router = APIRouter()
 
-
 @router.post(
     "/apply/{job_id}"
 )
-
 async def apply_job(
 
     job_id:str,
@@ -78,61 +78,151 @@ async def apply_job(
     job = db.query(
         Job
     ).filter(
-
         Job.public_job_id
         ==
         job_id
-
     ).first()
-
-    candidate = db.query(
-
-    Candidate
-
-).filter(
-
-    Candidate.id
-    ==
-    current_user[
-        "candidate_id"
-    ]
-
-).first()
 
 
     if not job:
+        
+        return {
+
+        "message":
+
+        "Job Not Found"
+
+    }
+
+
+    if job.status == "Closed":
+        
+        return {
+            "message":
+            
+            "Job Closed"
+            
+        }
+
+    candidate = db.query(
+        Candidate
+    ).filter(
+        Candidate.id
+        ==
+        current_user[
+            "candidate_id"
+        ]
+    ).first()
+
+
+    organization = db.query(
+        Organization
+    ).filter(
+        Organization.id
+        ==
+        job.org_id
+    ).first()
+
+
+    active_applications = db.query(
+        Application
+    ).filter(
+
+        Application.org_id
+        ==
+        job.org_id,
+
+        Application.candidate_id
+        ==
+        candidate.id,
+
+       Application.status.in_(
+
+    [
+
+        "Active",
+
+        "Pending",
+
+        "Review",
+
+        "Shortlisted",
+
+        "Rejected"
+
+    ]
+
+)
+
+    ).count()
+
+
+    if active_applications >= organization.max_applications:
 
         return {
 
             "message":
-            "Job Not Found"
+
+            f"Maximum {organization.max_applications} applications allowed for this organization"
 
         }
 
+    existing_application = db.query(
+
+    Application
+
+).filter(
+
+    Application.job_id
+    ==
+    job.id,
+
+    Application.candidate_id
+    ==
+    candidate.id,
+
+    Application.status.notin_(
+
+        [
+
+            "Withdrawn",
+
+            "Closed"
+
+        ]
+
+    )
+
+).first()
+
+
+    if existing_application:
+
+        return {
+
+            "message":
+
+            "Already Applied"
+
+        }
+    
+
+
 
     file_path = (
-
         f"uploads/"
-
         f"{resume.filename}"
-
     )
 
 
     with open(
-
         file_path,
-
         "wb"
-
     ) as buffer:
 
         shutil.copyfileobj(
-
             resume.file,
-
             buffer
-
         )
 
 
@@ -172,6 +262,7 @@ async def apply_job(
 
         job_id=
         job.id
+
     )
 
 
@@ -181,15 +272,16 @@ async def apply_job(
 
     db.commit()
 
+
     await send_application_mail(
 
-    candidate.email,
+        candidate.email,
 
-    candidate.email,
+        candidate.email,
 
-    job.title
+        job.title
 
-)
+    )
 
 
     return {
@@ -198,10 +290,12 @@ async def apply_job(
         "Application Submitted"
 
     }
+
+
+
 @router.get(
     "/my-applications"
 )
-
 def my_applications(
 
     current_user:
@@ -218,9 +312,7 @@ def my_applications(
 ):
 
     applications = db.query(
-
         Application
-
     ).filter(
 
         Application.candidate_id
@@ -233,10 +325,12 @@ def my_applications(
 
 
     return applications
+
+
+
 @router.get(
     "/organization"
 )
-
 def organization_applications(
 
     current_user:
@@ -253,23 +347,17 @@ def organization_applications(
 ):
 
     if current_user.get(
-
         "role"
-
     ) != "admin":
 
         return {
-
             "message":
             "Admin Access Only"
-
         }
 
 
     applications = db.query(
-
         Application
-
     ).filter(
 
         Application.org_id
@@ -282,3 +370,126 @@ def organization_applications(
 
 
     return applications
+    
+@router.put(
+    "/withdraw/{application_id}"
+)
+
+def withdraw_application(
+
+    application_id:str,
+
+    current_user:
+    dict=
+    Depends(
+        get_current_user
+    ),
+
+    db:Session=
+    Depends(
+        get_db
+    )
+
+):
+
+    application = db.query(
+
+    Application
+
+).filter(
+
+    Application.public_application_id
+    ==
+    application_id,
+
+    Application.candidate_id
+    ==
+    current_user.get(
+        "candidate_id"
+    )
+
+).first()
+
+
+    if not application:
+
+        return {
+
+            "message":
+
+            "Application Not Found"
+
+        }
+
+
+    application.status = "Withdrawn"
+
+    db.commit()
+
+
+    return {
+
+        "message":
+
+        "Application Withdrawn"
+
+    }
+
+@router.put(
+    "/close/{application_id}"
+)
+
+def close_application(
+
+    application_id:str,
+
+    current_user:
+    dict=
+    Depends(
+        get_current_user
+    ),
+
+    db:Session=
+    Depends(
+        get_db
+    )
+
+):
+
+    application = db.query(
+
+        Application
+
+    ).filter(
+
+        Application.public_application_id
+        ==
+        application_id
+
+    ).first()
+
+
+    if not application:
+
+        return {
+
+            "message":
+
+            "Application Not Found"
+
+        }
+
+
+    application.status = "Closed"
+
+
+    db.commit()
+
+
+    return {
+
+        "message":
+
+        "Application Closed"
+
+    }

@@ -59,7 +59,10 @@ async def register_organization(
     data.website,
 
     industry=
-    data.industry
+    data.industry,
+
+    max_applications =
+    data.max_applications,
 )
 
 

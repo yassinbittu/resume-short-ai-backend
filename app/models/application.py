@@ -110,11 +110,11 @@ class Application(Base):
 
     status = Column(
 
-        String,
+    String,
 
-        default="Pending"
+    default="Active"
 
-    )
+)
 
 
     ats_score = Column(

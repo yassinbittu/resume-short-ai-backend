@@ -29,7 +29,6 @@ from services.ats_service import (
 
 router = APIRouter()
 
-
 @router.post(
     "/analyze/{application_id}"
 )
@@ -87,6 +86,7 @@ def analyze_resume(
 
     )
 
+
     jd_text = f"""
 
     {job.title}
@@ -97,7 +97,7 @@ def analyze_resume(
 
     {job.experience}
 
-"""
+    """
 
 
     ats_score = calculate_ats(
@@ -114,15 +114,45 @@ def analyze_resume(
 
     if ats_score >= 70:
 
-        application.decision ="Shortlisted"
+        application.decision = "Shortlisted"
+
+        application.status = "Shortlisted"
+
 
     elif ats_score >= 50:
 
-        application.decision ="Review"
+        application.decision = "Review"
+
+        application.status = "Review"
+
 
     else:
 
-        application.decision ="Rejected"
+        application.decision = "Rejected"
+
+        application.status = "Rejected"
+
+
+    shortlisted_count = db.query(
+
+        Application
+
+    ).filter(
+
+        Application.job_id
+        ==
+        job.id,
+
+        Application.status
+        ==
+        "Shortlisted"
+
+    ).count()
+
+
+    if shortlisted_count >= job.openings:
+
+        job.status = "Closed"
 
 
     db.commit()
@@ -137,6 +167,9 @@ def analyze_resume(
         ats_score,
 
         "decision":
-        application.decision
+        application.decision,
+
+        "job_status":
+        job.status
 
     }
